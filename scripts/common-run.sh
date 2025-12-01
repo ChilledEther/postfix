@@ -35,29 +35,6 @@ setup_timezone() {
 }
 
 check_environment_sane() (
-	local permissions
-
-	if [[ ! -d /var/log ]]; then
-		error "/var/log directory does not exist. Ensure that you have proper mounts in your container / pod"
-	fi
-
-	permissions="$(stat /var/log/ | grep Access | grep -i "Uid:" | cut -d: -f2- | cut -d\( -f2- | cut -d/ -f1)"
-
-	if [[ "$permissions" =~ 777$ ]]; then
-		# Fix for #249
-		if [[ "$K8S_STATEFULSET_PERSISTENCE_ENABLED" == "false" ]]; then
-			# When kubernetes mounts an `emptyDir`, it is by default mounted as
-			# 777. Apparently, this is not something that logrotate likes. To fix
-			# this issue, we just change the permission of the folder to a bit
-			# more restrictive.
-			notice "Running from ${emphasis}emptyDir${reset} on Kubernetes. Fixing permissions for ${emphasis}/var/log${reset} to ${emphasis}755${reset}"
-			# Fix /var/log permissions when using emptyDir (persistence disabled)
-			chmod 755 /var/log
-		else
-			warn "Too broad permissions (${emphasis}777${reset}) for ${emphasis}/var/log${reset}. ${emphasis}logrotate${reset} will likely complain."
-		fi
-	fi
-
 	if touch /tmp/test; then
 		debug "/tmp writable."
 		rm /tmp/test
@@ -78,17 +55,9 @@ rsyslog_log_format() {
 }
 
 logrotate_remove_duplicate_mail_log() {
-	# /etc/logrotate.d/logrotate.conf does not exist on a default install of Alpine
-	if [[ -f /etc/logrotate.d/logrotate.conf ]]; then
-		if egrep -q '^/var/log/mail.log' /etc/logrotate.d/logrotate.conf; then
-			info "Removing /var/log/mail.log from /etc/logrotate.d/logrotate.conf"
-			sed -i -E '/^\/var\/log\/mail.log/d' /etc/logrotate.d/logrotate.conf
-		fi
-	elif [[ -f /etc/logrotate.d/rsyslog ]]; then
-		if egrep -q '^/var/log/mail.log' /etc/logrotate.d/rsyslog; then
-			info "Removing /var/log/mail.log from /etc/logrotate.d/rsyslog"
-			sed -i -E '/^\/var\/log\/mail.log/d' /etc/logrotate.d/rsyslog
-		fi
+	if egrep -q '^/var/log/mail.log' /etc/logrotate.d/logrotate.conf; then
+		info "Removing /var/log/mail.log from /etc/logrotate.d/rsyslog"
+		sed -i -E '/^\/var\/log\/mail.log/d' /etc/logrotate.d/rsyslog
 	fi
 }
 
@@ -259,8 +228,8 @@ postfix_upgrade_daemon_directory() {
 	local dir_alpine="/usr/libexec/postfix"  # Alpine
 
 
-	# Some people will keep the configuration of postfix on an external drive, although this is not strictly necessary by this
-	# image. And when they switch between different distributions (Alpine -> Debian and vice versa), the image will fail with the
+	# Some people will keep the configuration of postfix on an external drive, although this is not strictly neccessary by this
+	# image. And when they switch between different distrubtions (Alpine -> Debian and vice versa), the image will fail with the
 	# old configuration. This is a quick and dirty check to solve this issue so we don't get issues like these:
 	# https://github.com/bokysan/docker-postfix/issues/147
 	local daemon_directory="$(get_postconf "daemon_directory")"
@@ -289,7 +258,7 @@ postfix_disable_utf8() {
 	if [[ -f /etc/alpine-release ]] && [[ "${smtputf8_enable}" == "yes" ]]; then
 		debug "Running on Alpine. Setting ${emphasis}smtputf8_enable${reset}=${emphasis}no${reset}, as Alpine does not have proper libraries to handle UTF-8"
 		do_postconf -e smtputf8_enable=no
-	elif [[ ! -f /etc/alpine-release ]] && [[ "${smtputf8_enable}" == "no" ]]; then
+	elif [[ "${smtputf8_enable}" == "no" ]]; then
 		debug "Running on non-Alpine system. Setting ${emphasis}smtputf8_enable${reset}=${emphasis}yes${reset}."
 		do_postconf -e smtputf8_enable=yes
 	fi
@@ -330,7 +299,7 @@ postfix_reject_invalid_helos() {
 	do_postconf -e smtpd_delay_reject=yes
 	do_postconf -e smtpd_helo_required=yes
 	# Fast reject -- reject straight away when the client is connecting
-	do_postconf -e "smtpd_client_restrictions=permit_mynetworks,permit_sasl_authenticated,reject"
+	do_postconf -e "smtpd_client_restrictions=permit_mynetworks,reject"
 	# Reject / accept on EHLO / HELO command
 	do_postconf -e "smtpd_helo_restrictions=permit_mynetworks,reject_invalid_helo_hostname,permit"
 	# Delayed reject -- reject on MAIL FROM command. Not strictly neccessary to have both, but doesn't hurt
@@ -338,22 +307,9 @@ postfix_reject_invalid_helos() {
 }
 
 postfix_set_hostname() {
-    local ip
-    local hostname
 	do_postconf -# myhostname
-	if [[ -z "$POSTFIX_myhostname" ]] && [[ "${AUTOSET_HOSTNAME}" == "1" ]]; then
-		warn "Both ${emphasis}POSTFIX_myhostname${reset} and ${emphasis}AUTOSET_HOSTNAME${reset} are set. ${emphasis}POSTFIX_myhostname${reset} will take precedence and ${emphasis}AUTOSET_HOSTNAME${reset} will be ignored."
-	fi
-
 	if [[ -z "$POSTFIX_myhostname" ]]; then
 		POSTFIX_myhostname="${HOSTNAME}"
-	elif [[ "${AUTOSET_HOSTNAME}" == "1" ]]; then
-		ip=$(get_public_ip)
-		hostname=$(dig +short -x $IP)
-		# Remove the trailing dot
-		hostname="${hostname%.}"
-		notice "Automatically setting Postfix hostname to ${emphasis}${hostname}${reset} based on your public IP address ${emphasis}${ip}${reset}..."
-		POSTFIX_myhostname="${hostname}"
 	fi
 }
 
@@ -791,27 +747,8 @@ postfix_open_submission_port() {
 
 execute_post_init_scripts() {
 	if [ -d /docker-init.db/ ]; then
-		notice "Executing any found custom scripts found in ${emphasis}/docker-init.db/${reset}..."
-		warn "${emphasis}/docker-init.db/${reset} is deprecated. Please move your scripts (mount them) to ${emphasis}/docker-init.d/${reset} (See https://github.com/bokysan/docker-postfix/issues/236)"
+		notice "Executing any found custom scripts..."
 		for f in /docker-init.db/*; do
-			case "$f" in
-				*.sh)
-					if [[ -x "$f" ]]; then
-						echo -e "\tsourcing ${emphasis}$f${reset}"
-						. "$f"
-					else
-						echo -e "\trunning ${emphasis}bash $f${reset}"
-						bash "$f"
-					fi
-					;;
-				*)
-					echo "$0: ignoring $f" ;;
-			esac
-		done
-	fi
-	if [ -d /docker-init.d/ ]; then
-		notice "Executing any found custom scripts found in ${emphasis}/docker-init.d/${reset}..."
-		for f in /docker-init.d/*; do
 			case "$f" in
 				*.sh)
 					if [[ -x "$f" ]]; then

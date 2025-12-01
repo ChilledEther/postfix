@@ -32,14 +32,14 @@ postfix_setup_xoauth2_post_setup        # (Post) Setup XOAUTH2 authentication
 postfix_setup_networks                  # Set MYNETWORKS
 postfix_setup_debugging                 # Enable debugging, if defined
 postfix_setup_sender_domains            # Configure allowed sender domains
-postfix_setup_masquarading              # Setup masqueraded domains
+postfix_setup_masquarading              # Setup masquaraded domains
 postfix_setup_header_checks             # Enable SMTP header checks, if defined
 postfix_setup_dkim                      # Configure DKIM, if enabled
 postfix_setup_smtpd_sasl_auth           # Enable sender SASL auth, if defined
 postfix_custom_commands                 # Apply custom postfix settings
 opendkim_custom_commands                # Apply custom OpenDKIM settings
 postfix_open_submission_port            # Enable the submission port
-execute_post_init_scripts               # Execute any scripts found in /docker-init.d/
+execute_post_init_scripts               # Execute any scripts found in /docker-init.db/
 unset_sensitive_variables               # Remove environment variables that contains sensitive values (secrets) that are read from conf files
 
 notice "Starting: ${emphasis}rsyslog${reset}, ${emphasis}crond${reset}, ${emphasis}postfix${reset}$DKIM_ENABLED"
