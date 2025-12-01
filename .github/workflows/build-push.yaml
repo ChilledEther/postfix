@@ -23,7 +23,7 @@ jobs:
     # - name: Set up QEMU (optional for cross-platform builds)
     #   uses: docker/setup-qemu-action@v2
 
-    # - name: Set up Docker Buildx
+    # - name: docker-buildx
     #   uses: docker/setup-buildx-action@v2
 
     - name: ghcr-login
@@ -37,7 +37,7 @@ jobs:
       uses: docker/build-push-action@v4
       with:
         context: ./build
-        file: ./dockerfile
+        file: ./build/dockerfile
         push: true
         tags: |
           ${{ env.IMAGE }}:latest
