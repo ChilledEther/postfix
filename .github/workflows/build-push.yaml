@@ -15,7 +15,7 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     env:
-      IMAGE: ghcr.io/${{ github.repository }}
+      IMAGE: ${{ toLower(format('ghcr.io/{0}', github.repository)) }}
     steps:
     - name: checkout
       uses: actions/checkout@v6
