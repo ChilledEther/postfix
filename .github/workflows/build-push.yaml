@@ -32,7 +32,6 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: docker-build-push
-      if: startsWith(github.ref, 'refs/tags/')
       uses: docker/build-push-action@v4
       with:
         context: ./build
@@ -44,7 +43,7 @@ jobs:
         # cache-from: type=gha
         # cache-to: type=gha,mode=max
 
-    - name: Publish tag name (if this push is a Git tag)
+    - name: docker-build-push-tags
       if: startsWith(github.ref, 'refs/tags/')
       uses: docker/build-push-action@v4
       with:
