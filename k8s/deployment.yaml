@@ -14,14 +14,18 @@ spec:
     spec:
       containers:
       - name: postfix
-        image: myregistry/postfix-relay:latest
-        envFrom:
-        - secretRef:
-            name: postfix-sasl-secret
-        volumeMounts:
-        - name: whitelist
-          mountPath: /config
-      volumes:
-      - name: whitelist
-        configMap:
-          name: postfix-whitelist
+        image: ghcr.io/chilledether/postfix:latest
+        env:
+        - name: RELAYHOST
+          value: "smtp.relay.example.com:587"
+        - name: RELAYHOST_USERNAME
+          value: "my-relay-username"
+        - name: RELAYHOST_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postfix-sasl-secret
+              key: RELAYHOST_PASSWORD
+        - name: ALLOWED_SENDER_DOMAINS
+          value: "example.com example.org"
+        - name: POSTFIX_smtp_tls_security_level
+          value: encrypt
