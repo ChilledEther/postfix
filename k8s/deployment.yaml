@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postfix-relay
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postfix-relay
+  template:
+    metadata:
+      labels:
+        app: postfix-relay
+    spec:
+      containers:
+      - name: postfix
+        image: myregistry/postfix-relay:latest
+        envFrom:
+        - secretRef:
+            name: postfix-sasl-secret
+        volumeMounts:
+        - name: whitelist
+          mountPath: /config
+      volumes:
+      - name: whitelist
+        configMap:
+          name: postfix-whitelist
