@@ -15,7 +15,7 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     env:
-      IMAGE: ${{ toLower(format('ghcr.io/{0}', github.repository)) }}
+      IMAGE: ghcr.io/chilledether/postfix
     steps:
     - name: checkout
       uses: actions/checkout@v6
